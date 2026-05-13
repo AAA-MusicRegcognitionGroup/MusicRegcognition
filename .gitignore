@@ -1,0 +1,42 @@
+# 音频与数据集文件
+*.wav
+*.mp3
+*.mid
+*.midi
+/data/
+/dataset/
+/MIR-QBSH/
+
+# 允许上传用于演示的小样本音频 (放到 demo_samples 文件夹下)
+!demo_samples/**/*.wav
+!demo_samples/**/*.mp3
+!demo_samples/**/*.mid
+
+
+# Python 缓存与运行生成文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 虚拟环境
+venv/
+env/
+.env
+
+# Jupyter Notebook 检查点
+.ipynb_checkpoints/
+
+# IDE 与操作系统配置
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 模型文件/缓存结果
+*.npy
+*.npz
+*.pkl
+*.h5
+*.pt
+*.pth
