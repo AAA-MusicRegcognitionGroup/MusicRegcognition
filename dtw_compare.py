@@ -1,77 +1,74 @@
 import numpy as np
 import librosa
+import scipy.signal  # 用于二次滤波，消除残余突刺
 
 # ==========================================
 # 调用说明与使用方法
 # ==========================================
-# 
-# 该模块实现了“基础2”的核心要求：使用 DTW（动态时间规整）算法对比两个音高序列的相似度。
-# 包含零均值归一化处理，解决哼唱整体跑调（即使偏移好几个半音或几个八度，由于相对音高走势一致，相似度依然很高即可匹配）。
-# 
-# 示例用法：
-"""
-    from process_audio import get_pitch_contour
-    from dtw_compare import calculate_similarity
-    
-    # 提取测试者的哼唱音高
-    humming_seq = get_pitch_contour("demo_samples/humming.wav")
-    
-    # 这里为了演示，我们假设有了两首标准库中的旋律序列
-    # (真实场景中可以通过读取 MIDI 文件转换得到)
-    std_seq_1 = np.array([60, 62, 64, 60, 60, 62, 64, 60]) # 两只老虎
-    std_seq_2 = np.array([67, 67, 64, 64, 62, 62, 60, 60]) # 其他旋律
-    
-    score1 = calculate_similarity(humming_seq, std_seq_1)
-    score2 = calculate_similarity(humming_seq, std_seq_2)
-    
-    print(f"与歌曲1距离: {score1}, 与歌曲2距离: {score2}")
-"""
+# 该模块实现了针对“子序列匹配”和“现场录音”高度优化的相似度比对逻辑：
+# 1. 二次中值滤波：彻底抹平自相关法产生的倍频/半频“突刺”。
+# 2. 哼唱静音截断：只对用户哼唱进行静音截断，保留 MIDI 完整的时间轴脉络。
+# 3. 音符量化：将浮点音高归类到整数半音，忽略嗓音自然抖动产生的细微偏差。
+# 4. 改进型零均值归一化：计算 MIDI 均值时自动剔除休止符（0值），避免均值被稀释。
+# 5. 子序列 DTW：允许片段匹配，无视录音前后的空白，自动在长乐谱中滑动寻找最优匹配。
 
 def calculate_similarity(seq1, seq2, remove_silence=True):
     """
-    通过 DTW 算法计算两个音高序列的距离（距离越小，相似度越高）。
-    包含零均值归一化处理（Zero-Mean Normalization）。
+    通过改进的子序列 DTW 算法计算两个音高序列的距离。
     
-    :param seq1: 第一个音高序列 (通常为哼唱提取的 pitch contour)
-    :param seq2: 第二个音高序列 (通常为标准 MIDI 乐谱提取的 contour)
-    :param remove_silence: 是否去除前后的静音段(值为0的帧)，默认去除。
-    :return: 归一化后的 DTW 距离值。返回浮点数，数值越小越匹配。
+    :param seq1: 哼唱音高序列 (短查询序列)
+    :param seq2: 标准 MIDI 序列 (长基准序列)
+    :param remove_silence: 是否去除哼唱前后的静音段，默认去除。
+    :return: 归一化后的 DTW 距离。数值越小越匹配。
     """
     seq1 = np.array(seq1, dtype=float)
     seq2 = np.array(seq2, dtype=float)
     
-    # 1. 剔除静音帧 (值为 0 的帧)
-    # 因为静音帧不参与旋律走势的比对，且如果带着 0 直接去做均值归一化，会严重拉低均值的准确性
+    # 1. 二次中值滤波 (针对用户录音中的倍频/半频突刺进行强力抹平)
+    if len(seq1) > 7:
+        seq1 = scipy.signal.medfilt(seq1, kernel_size=7)
+    
+    # 2. 差异化静音处理
     if remove_silence:
-        seq1 = seq1[seq1 > 0]
-        seq2 = seq2[seq2 > 0]
+        seq1 = seq1[seq1 > 0]  # 哼唱片段必须剔除静音，避免干扰
+        # 【核心变更】：绝对不能裁剪 seq2 的 0！必须保留完整 MIDI 的时间轴结构
+        # seq2 = seq2[seq2 > 0] 
         
-    # 如果剔除静音后序列太空，无法比较，直接返回无穷大距离
-    if len(seq1) == 0 or len(seq2) == 0:
+    if len(seq1) < 5 or len(seq2) < 5:
         return float('inf')
         
-    # 2. 零均值归一化 (Zero-Mean Normalization)
-    # 将两个序列减去各自的平均音高。
-    # 作用：只要“音高的相对起伏”一致（例如 60-62-64 和 62-64-66），
-    # 减去各自均值后它们就会变成一样的序列。完美解决男生女生八度不同、或者起调偏高偏低的问题。
-    seq1_norm = seq1 - np.mean(seq1)
-    seq2_norm = seq2 - np.mean(seq2)
+    # 3. 音符量化 (Note Quantization)
+    # 将浮点音高取整为标准半音编号，忽略 0.5 半音左右的自然嗓音抖动
+    seq1 = np.round(seq1)
+    seq2 = np.round(seq2)
     
-    # librosa.sequence.dtw 要求输入维度为 (特征维度, 时间步数)
-    # 因此我们需要使用 reshape(1, -1) 将 1D 数组变维
+    # 4. 改进型零均值归一化 (Zero-Mean Normalization)
+    mean1 = np.mean(seq1)
+    
+    # 【核心变更】：计算 MIDI 均值时，只统计大于 0 的发声帧，防止被前奏或休止符的 0 稀释值
+    midi_voice_frames = seq2[seq2 > 0]
+    if len(midi_voice_frames) == 0:
+        return float('inf')
+    mean2 = np.mean(midi_voice_frames)
+    
+    seq1_norm = seq1 - mean1
+    # 减去正确均值后，原曲中原本是 0 的休止符帧会变成一个很大的负数
+    # 这个负数在 DTW 计算时会产生极高的惩罚代价，完美阻止系统将你的哼唱误匹配到空白段上
+    seq2_norm = seq2 - mean2
+    
+    # 准备 DTW 输入数据 (调整为 librosa 要求的维数)
     X = seq1_norm.reshape(1, -1)
     Y = seq2_norm.reshape(1, -1)
     
-    # 3. 计算 DTW 距离
-    # metric='euclidean' 表示每对音高节点之间使用欧氏距离（绝对差值）计算路损
-    D, wp = librosa.sequence.dtw(X, Y, metric='euclidean')
+    # 5. 子序列 DTW 核心计算
+    # 设置 subseq=True，开启滑窗局部匹配模式
+    D, wp = librosa.sequence.dtw(X, Y, metric='euclidean', subseq=True)
     
-    # D[-1, -1] 存储的是到达终点的“累计最小代价 (Accumulated Cost)”
-    total_cost = D[-1, -1]
+    # 在子序列匹配模式下，最终的最小累计代价位于累计代价矩阵 D 最后一行的最小值中
+    total_cost = np.min(D[-1, :])
     
-    # 4. 路径长度归一化
-    # 哼唱的快慢/长度不同会导致累加的代价不公平（较长的序列累计误差天然就大）。
-    # 所以我们将总距离除以匹配路径的总步数 (len(wp))，得到平均每步的偏差。
+    # 6. 路径长度归一化
+    # 消除哼唱长短对累加总代价的影响，计算平均每帧的偏差距离
     normalized_distance = total_cost / len(wp)
     
     return normalized_distance

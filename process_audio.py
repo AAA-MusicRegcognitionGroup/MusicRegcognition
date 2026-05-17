@@ -24,7 +24,7 @@ from extract_pitch import extract_pitch
     print(f"提取了 {len(pitch_contour)} 帧基频: {pitch_contour[:10]}...")
 """
 
-def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold=0.0317):
+def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold=0.06):
     """
     读取整个音频文件，提取基频轨迹（序列）
     
@@ -72,6 +72,6 @@ def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, w
     pitch_array = np.array(pitch_contour)
     valid_idx = pitch_array > 0
     if np.any(valid_idx):
-        pitch_array[valid_idx] = medfilt(pitch_array[valid_idx], kernel_size=5)
+        pitch_array[valid_idx] = medfilt(pitch_array[valid_idx], kernel_size=11)
         
     return pitch_array
