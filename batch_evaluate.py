@@ -54,7 +54,7 @@ def evaluate_one(num_str, task_dir="demo_samples/task2"):
 
 def main():
     print("=" * 70)
-    print("  批量基频提取准确率评测 (00011 ~ 00030)")
+    print("  批量基频提取准确率评测 (00001 ~ 00014)")
     print("=" * 70)
     print(f"  {'编号':<8} {'有效帧数':<10} {'严格准确率':<12} {'八度容错':<12} {'平均半音误差':<14}")
     print("-" * 70)
@@ -62,7 +62,7 @@ def main():
     strict_list, octave_list, error_list = [], [], []
     missing = []
 
-    for num in range(11, 31):
+    for num in range(1, 15):
         num_str = str(num).zfill(5)
         result = evaluate_one(num_str)
 

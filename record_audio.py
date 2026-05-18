@@ -1,36 +1,56 @@
 import os
 import wave
+import threading
 import pyaudio
-import numpy as np # 利用 numpy 进行数值归一化
+import numpy as np
 
-def record_audio_to_project(file_name="live_test.wav", duration=5):
+def record_audio_to_project(file_name="live_test.wav", duration=None):
     """
-    录制音频、进行音量归一化，并保存到项目的 demo_samples/进阶1/ 目录下
+    录制音频、进行音量归一化，并保存到项目的 demo_samples/进阶1/ 目录下。
+    duration=None 表示手动按回车停止；传入数字则表示固定时长（秒）。
     """
     save_dir = "demo_samples/进阶1/"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    
+
     output_path = os.path.join(save_dir, file_name)
 
-    # 配置参数
-    SR = 8000 
+    SR = 8000
     CHUNK = 1024
-    FORMAT = pyaudio.paInt16 # 16位深度，数值范围 -32768 到 32767
+    FORMAT = pyaudio.paInt16
     CHANNELS = 1
 
     p = pyaudio.PyAudio()
-
-    print(f">>> 准备录音 (时长: {duration}秒)...")
     stream = p.open(format=FORMAT, channels=CHANNELS, rate=SR,
                     input=True, frames_per_buffer=CHUNK)
 
-    print(">>> 正在录制，请开始哼唱...")
     frames = []
+    stop_event = threading.Event()
 
-    for _ in range(0, int(SR / CHUNK * duration)):
-        data = stream.read(CHUNK)
-        frames.append(data)
+    def _record_loop():
+        if duration is not None:
+            for _ in range(0, int(SR / CHUNK * duration)):
+                if stop_event.is_set():
+                    break
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                frames.append(data)
+        else:
+            while not stop_event.is_set():
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                frames.append(data)
+
+    if duration is not None:
+        print(f">>> 准备录音 (时长: {duration}秒)...")
+        print(">>> 正在录制，请开始哼唱...")
+        _record_loop()
+    else:
+        print(">>> 准备录音，按回车键停止...")
+        print(">>> 正在录制，请开始哼唱...")
+        t = threading.Thread(target=_record_loop, daemon=True)
+        t.start()
+        input()
+        stop_event.set()
+        t.join()
 
     print(">>> 录音结束，正在进行音量归一化处理...")
 
@@ -64,4 +84,4 @@ def record_audio_to_project(file_name="live_test.wav", duration=5):
     print(f">>> 归一化后的文件已保存至: {os.path.abspath(output_path)}")
 
 if __name__ == "__main__":
-    record_audio_to_project(file_name="live_test.wav", duration=10)
+    record_audio_to_project(file_name="live_test.wav")
