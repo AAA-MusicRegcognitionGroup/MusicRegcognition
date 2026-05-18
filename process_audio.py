@@ -1,7 +1,7 @@
 # 音频级别基频序列提取
 import numpy as np
 import librosa
-from scipy.signal import medfilt
+from scipy.signal import medfilt, butter, sosfiltfilt
 from extract_pitch import extract_pitch
 
 # ==========================================
@@ -24,24 +24,34 @@ from extract_pitch import extract_pitch
     print(f"提取了 {len(pitch_contour)} 帧基频: {pitch_contour[:10]}...")
 """
 
-def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold=0.06):
+def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold='auto'):
     """
     读取整个音频文件，提取基频轨迹（序列）
-    
+
     :param audio_path: 音频文件路径 (如 .wav)
     :param sr: 采样率，默认 8000 匹配 MIR-QBSH 数据集
     :param frame_samples: 帧长 (采样点数)，默认 256
     :param hop_samples: 帧移 (采样点数)，默认 256
     :param window: 传给单帧提取算法的窗函数类型
-    :param energy_threshold: 能量阈值。低于该阈值的帧将被视为静音，基频置为 0
+    :param energy_threshold: 能量阈值。'auto' 时自适应计算 (median*0.4, 最低 0.015)；
+                             传入数值则使用固定阈值。低于阈值的帧视为静音，基频置 0。
     :return: 包含所有帧基频的一维 numpy 数组序列 (Pitch Contour)
     """
     # 1. 读取音频波形 (必须以相同采样率读取)
     y, sr = librosa.load(audio_path, sr=sr, mono=True)
-    
+
+    # 1.5 高通滤波去除低频环境噪声 (60Hz 以下人声基频极少出现)
+    sos = butter(4, 60, btype='highpass', fs=sr, output='sos')
+    y = sosfiltfilt(sos, y)
+
     # 2. 计算短时能量 (用于过滤静音)
     # 取均方根能量
     rms_energy = librosa.feature.rms(y=y, frame_length=frame_samples, hop_length=hop_samples, center=False)[0]
+
+    # 2.5 自适应阈值：取非零帧 RMS 中位数的 40%，下限 0.015
+    if energy_threshold == 'auto':
+        rms_nonzero = rms_energy[rms_energy > 0]
+        energy_threshold = max(np.median(rms_nonzero) * 0.4, 0.015) if len(rms_nonzero) > 0 else 0.015
     
     # 3. 执行分帧操作
     frames = librosa.util.frame(y, frame_length=frame_samples, hop_length=hop_samples)

@@ -44,17 +44,16 @@ def calculate_similarity(seq1, seq2, remove_silence=True):
     
     # 4. 改进型零均值归一化 (Zero-Mean Normalization)
     mean1 = np.mean(seq1)
-    
-    # 【核心变更】：计算 MIDI 均值时，只统计大于 0 的发声帧，防止被前奏或休止符的 0 稀释值
+
     midi_voice_frames = seq2[seq2 > 0]
     if len(midi_voice_frames) == 0:
         return float('inf')
     mean2 = np.mean(midi_voice_frames)
-    
+
     seq1_norm = seq1 - mean1
-    # 减去正确均值后，原曲中原本是 0 的休止符帧会变成一个很大的负数
-    # 这个负数在 DTW 计算时会产生极高的惩罚代价，完美阻止系统将你的哼唱误匹配到空白段上
     seq2_norm = seq2 - mean2
+    # 休止符还原为 0：含休止符的歌曲不应受额外惩罚，无休止符的也不应占便宜
+    seq2_norm[seq2 == 0] = 0
     
     # 准备 DTW 输入数据 (调整为 librosa 要求的维数)
     X = seq1_norm.reshape(1, -1)
