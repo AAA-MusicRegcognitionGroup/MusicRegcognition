@@ -3,3 +3,4 @@ scipy
 librosa
 matplotlib
 pretty_midi
+audio-separator[cpu]

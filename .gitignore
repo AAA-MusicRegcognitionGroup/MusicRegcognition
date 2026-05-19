@@ -6,6 +6,7 @@
 /data/
 /dataset/
 /MIR-QBSH/
+/separator_models/
 
 # 允许上传用于演示的小样本音频 (放到 demo_samples 文件夹下)
 !demo_samples/**/*.wav

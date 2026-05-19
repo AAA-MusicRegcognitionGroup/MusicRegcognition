@@ -7,6 +7,12 @@ import pretty_midi  # 需要 pip install pretty_midi
 from process_audio import get_pitch_contour
 from dtw_compare import calculate_similarity
 
+try:
+    from split_demo import run_audio_separation
+    _HAS_AUDIO_SEPARATOR = True
+except ImportError:
+    _HAS_AUDIO_SEPARATOR = False
+
 # 常见中文字体支持（避免绘图乱码，如果有报错可注释掉这部分）
 plt.rcParams['font.sans-serif'] = ['SimHei'] 
 plt.rcParams['axes.unicode_minus'] = False
@@ -52,6 +58,15 @@ def get_midi_contour(midi_path, hop_ms=10):
                 end_idx = min(end_idx, len(contour))
                 contour[start_idx:end_idx] = note.pitch
     return contour
+
+def find_vocal_file(output_files):
+    """从 audio_separator 输出文件列表中定位人声 stem"""
+    for f in output_files:
+        basename = os.path.basename(f)
+        if "(Vocals)" in basename or "vocals" in basename.lower():
+            return f
+    return None
+
 
 def main():
     print("==================================================")
@@ -182,11 +197,33 @@ def main():
             print(f"错误: 未能检测到录音音频文件: {wav_path}")
             return
             
-        print("\n>>> 录音读取成功！正在提取实时人声音高特征...")
+        print("\n>>> 录音读取成功！")
+
+        # 尝试使用 AI 人声分离提升匹配精度
+        vocal_wav_path = wav_path  # 默认回退到原始录音
+        if _HAS_AUDIO_SEPARATOR:
+            print(">>> 正在进行 AI 人声分离（首次运行需下载模型约300MB，请耐心等待）...")
+            try:
+                sep_output_dir = target_dir
+                output_files = run_audio_separation(wav_path, output_dir=sep_output_dir)
+                vocal_file = find_vocal_file(output_files)
+                if vocal_file and os.path.exists(vocal_file):
+                    vocal_wav_path = vocal_file
+                    print(f">>> 人声分离成功，将使用分离后的人声进行匹配: {os.path.basename(vocal_file)}")
+                else:
+                    print(">>> 警告：未能从分离输出中定位人声文件，回退使用原始录音。")
+            except Exception as e:
+                print(f">>> 人声分离失败 ({e})，回退使用原始录音。")
+        else:
+            print(">>> 提示：未安装 audio-separator，跳过人声分离，直接使用原始录音。")
+            print(">>> 如需启用：pip install \"audio-separator[cpu]\"  # CPU 版本")
+            print(">>>           pip install \"audio-separator[gpu]\"  # NVIDIA GPU 版本")
+
+        print(">>> 正在提取人声音高特征...")
         hop_samples = 256
         sr = 8000
-        # 现场提取完整波形特征，不采用任何 5 秒截断逻辑
-        extracted_seq = get_pitch_contour(wav_path, sr=sr, frame_samples=hop_samples, hop_samples=hop_samples)
+        # 对分离后的人声（或回退的原始录音）提取完整波形特征，不采用任何 5 秒截断逻辑
+        extracted_seq = get_pitch_contour(vocal_wav_path, sr=sr, frame_samples=hop_samples, hop_samples=hop_samples)
         
         print("\n====== 正在利用 子序列 DTW 算法匹配完整检索曲库 ======")
         cache_dir = "midi_cache/" 
