@@ -41,3 +41,7 @@ Thumbs.db
 *.h5
 *.pt
 *.pth
+
+# AI agent files
+.claude
+.claude/
