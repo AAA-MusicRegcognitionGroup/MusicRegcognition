@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>哼唱识曲 — 信号与系统课程大作业</title>
+<style>
+  :root {
+    --bg: #0f1119;
+    --surface: #1a1d2e;
+    --border: #2a2d3e;
+    --text: #e1e4ed;
+    --text-secondary: #9498a8;
+    --accent: #5b8def;
+    --accent-glow: rgba(91,141,239,0.25);
+    --green: #3ecf8e;
+    --red: #f06565;
+    --amber: #f0b865;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .header h1 span { color: var(--accent); }
+  .badge {
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    border-radius: 99px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    font-weight: 600;
+    border: 1px solid rgba(91,141,239,0.3);
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .tab-btn {
+    padding: 10px 22px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    font-weight: 500;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #4a7ce0; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); }
+
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+  }
+  th, td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.76rem;
+    letter-spacing: 0.04em;
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .num { font-variant-numeric: tabular-nums; }
+  .metric-good { color: var(--green); font-weight: 600; }
+  .metric-med  { color: var(--amber); font-weight: 600; }
+  .metric-bad  { color: var(--red); font-weight: 600; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .summary-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    text-align: center;
+  }
+  .summary-card .label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+  .summary-card .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart-img {
+    width: 100%;
+    border-radius: var(--radius-sm);
+    margin-top: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 36px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(91,141,239,0.05);
+  }
+  .upload-zone p { color: var(--text-secondary); margin-top: 6px; font-size: 0.82rem; }
+  #file-name { color: var(--accent); font-weight: 600; margin-top: 8px; display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .progress-msg {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: rgba(91,141,239,0.08);
+    border: 1px solid rgba(91,141,239,0.2);
+    border-radius: var(--radius-sm);
+    margin-top: 16px;
+    font-size: 0.85rem;
+  }
+
+  .result-list { list-style: none; }
+  .result-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 14px;
+  }
+  .result-rank {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .result-item:first-child .result-rank {
+    background: var(--accent-glow);
+    color: var(--accent);
+  }
+  .result-song { flex: 1; font-weight: 600; }
+  .result-dist { font-variant-numeric: tabular-nums; color: var(--text-secondary); font-size: 0.85rem; }
+
+  #audio-file { display: none; }
+
+  @media (max-width: 640px) {
+    .header { padding: 14px 16px; }
+    .header h1 { font-size: 1.1rem; }
+    .container { padding: 16px 12px; }
+    .tabs { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>哼唱识曲 <span>QBH</span></h1>
+  <span class="badge">信号与系统课程大作业</span>
+</div>
+
+<div class="container">
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="batch">批量评测</button>
+    <button class="tab-btn" data-tab="single">单曲评测</button>
+    <button class="tab-btn" data-tab="match">实时匹配</button>
+  </div>
+
+  <!-- Tab 1: 批量评测 -->
+  <div class="tab-panel active" id="panel-batch">
+    <div class="card">
+      <h2>批量基频提取准确率评测（00001–00014）</h2>
+      <p style="color:var(--text-secondary);font-size:0.83rem;margin-bottom:16px;">
+        对全部 14 首 MIR-QBSH 样本运行自相关基频提取，与人工标注（.pv）逐一比对，输出准确率统计。
+      </p>
+      <button class="btn btn-primary" id="btn-batch-run" onclick="runBatch()">
+        开始批量评测
+      </button>
+      <div id="batch-progress"></div>
+      <div id="batch-results"></div>
+    </div>
+  </div>
+
+  <!-- Tab 2: 单曲评测 -->
+  <div class="tab-panel" id="panel-single">
+    <div class="card">
+      <h2>单曲基频提取评测</h2>
+      <p style="color:var(--text-secondary);font-size:0.83rem;margin-bottom:16px;">
+        选择歌曲编号（1–14），运行基频提取并与人工标注对比，查看提取准确率与折线图。
+      </p>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <select id="song-select" style="padding:8px 14px;border-radius:var(--radius-sm);background:var(--surface);color:var(--text);border:1px solid var(--border);font-size:0.85rem;">
+          <option value="">-- 请选择歌曲 --</option>
+        </select>
+        <button class="btn btn-primary" id="btn-single-run" onclick="runSingle()" disabled>
+          开始评测
+        </button>
+      </div>
+      <div id="single-progress"></div>
+      <div id="single-results"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: 实时匹配 -->
+  <div class="tab-panel" id="panel-match">
+    <div class="card">
+      <h2>实时哼唱识别</h2>
+      <p style="color:var(--text-secondary);font-size:0.83rem;margin-bottom:16px;">
+        现场录音或上传哼唱音频。系统将提取基频，尝试 AI 人声分离（如有），并通过子序列 DTW 算法在 14 首曲库中检索最匹配的歌曲。
+      </p>
+
+      <!-- 录音区域 -->
+      <div style="margin-bottom:18px;">
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;">方式一：现场录音</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btn-record" onclick="toggleRecording()" style="min-width:120px;">
+            <span id="record-icon">🎤</span> <span id="record-btn-text">开始录音</span>
+          </button>
+          <span id="record-timer" style="font-variant-numeric:tabular-nums;color:var(--text-secondary);font-size:0.9rem;display:none;">00:00</span>
+          <span id="record-status" style="font-size:0.82rem;display:none;"></span>
+        </div>
+        <div id="record-ready" style="margin-top:8px;display:none;">
+          <span style="color:var(--green);font-size:0.83rem;">录音完成，时长 <span id="record-duration"></span> 秒。请点击下方"开始匹配"按钮检索曲库。</span>
+        </div>
+      </div>
+
+      <!-- 分隔 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;color:var(--text-secondary);font-size:0.78rem;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span>或</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+
+      <!-- 上传区域 -->
+      <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;">方式二：上传文件</div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('audio-file').click()" style="padding:20px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="%235b8def" stroke-width="1.5">
+          <path d="M12 16V4m0 0L8 8m4-4l4 4M20 16v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2"/>
+        </svg>
+        <p style="font-size:0.78rem;">点击选择音频文件，或拖拽到此处</p>
+        <span id="file-name"></span>
+      </div>
+      <input type="file" id="audio-file" accept="audio/*,.wav,.mp3,.webm,.ogg,.flac,.m4a" onchange="onFileSelected(event)">
+
+      <button class="btn btn-primary" id="btn-match-run" style="margin-top:14px;" onclick="runMatch()" disabled>
+        开始匹配
+      </button>
+
+      <div id="match-progress"></div>
+      <div id="match-results"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+fetch('/api/songs')
+  .then(r => r.json())
+  .then(songs => {
+    const sel = document.getElementById('song-select');
+    songs.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', () => {
+      document.getElementById('btn-single-run').disabled = !sel.value;
+    });
+  });
+
+function metricClass(val, good, bad) {
+  if (val >= good) return 'metric-good';
+  if (val <= bad) return 'metric-bad';
+  return 'metric-med';
+}
+
+// ================================================================
+// 批量评测
+// ================================================================
+async function runBatch() {
+  const btn = document.getElementById('btn-batch-run');
+  const prog = document.getElementById('batch-progress');
+  const res = document.getElementById('batch-results');
+
+  btn.disabled = true;
+  prog.innerHTML = '<div class="progress-msg"><span class="spinner"></span> 正在对 14 首歌曲进行评测...</div>';
+  res.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/batch_evaluate', { method: 'POST' });
+    const data = await resp.json();
+
+    if (data.error) { prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">${data.error}</p>`; btn.disabled = false; return; }
+
+    prog.innerHTML = '';
+    let html = '';
+
+    if (data.summary && Object.keys(data.summary).length > 0) {
+      const s = data.summary;
+      html += `<div class="summary-grid">
+        <div class="summary-card"><div class="label">平均严格准确率</div><div class="value ${metricClass(s.avg_strict, 80, 50)}">${s.avg_strict}%</div></div>
+        <div class="summary-card"><div class="label">平均八度容错率</div><div class="value ${metricClass(s.avg_octave, 85, 55)}">${s.avg_octave}%</div></div>
+        <div class="summary-card"><div class="label">平均半音误差</div><div class="value">${s.avg_error}</div></div>
+        <div class="summary-card"><div class="label">最高严格准确率</div><div class="value metric-good">${s.max_strict}%</div></div>
+        <div class="summary-card"><div class="label">评测样本数</div><div class="value">${s.total_evaluated}</div></div>
+      </div>`;
+    }
+
+    html += '<div class="table-wrap"><table><thead><tr><th>编号</th><th>有效帧数</th><th>严格准确率</th><th>八度容错</th><th>平均半音误差</th></tr></thead><tbody>';
+    data.results.forEach(r => {
+      html += `<tr>
+        <td class="num"><strong>${r.id}</strong></td>
+        <td class="num">${r.total_frames}</td>
+        <td><span class="num ${metricClass(r.strict_acc, 80, 50)}">${r.strict_acc}%</span></td>
+        <td><span class="num ${metricClass(r.octave_acc, 85, 55)}">${r.octave_acc}%</span></td>
+        <td class="num">${r.mean_error}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    if (data.missing.length > 0) {
+      html += `<p style="color:var(--amber);margin-top:12px;font-size:0.83rem;">缺失/无效样本: ${data.missing.join(', ')}</p>`;
+    }
+    res.innerHTML = html;
+
+  } catch (e) {
+    prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">请求失败: ${e.message}</p>`;
+  }
+  btn.disabled = false;
+}
+
+// ================================================================
+// 单曲评测
+// ================================================================
+async function runSingle() {
+  const sel = document.getElementById('song-select');
+  const songId = sel.value;
+  if (!songId) return;
+
+  const btn = document.getElementById('btn-single-run');
+  const prog = document.getElementById('single-progress');
+  const res = document.getElementById('single-results');
+
+  btn.disabled = true;
+  prog.innerHTML = '<div class="progress-msg"><span class="spinner"></span> 正在提取基频序列...</div>';
+  res.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/evaluate/' + songId, { method: 'POST' });
+    const data = await resp.json();
+
+    if (data.error) { prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">${data.error}</p>`; btn.disabled = false; return; }
+
+    prog.innerHTML = '';
+    let html = `<div class="summary-grid">
+      <div class="summary-card"><div class="label">有效帧数</div><div class="value">${data.total_frames}</div></div>
+      <div class="summary-card"><div class="label">严格准确率</div><div class="value ${metricClass(data.strict_acc, 80, 50)}">${data.strict_acc}%</div></div>
+      <div class="summary-card"><div class="label">八度容错率</div><div class="value ${metricClass(data.octave_acc, 85, 55)}">${data.octave_acc}%</div></div>
+      <div class="summary-card"><div class="label">平均半音误差</div><div class="value">${data.mean_error} 半音</div></div>
+    </div>`;
+    if (data.chart) {
+      html += `<img class="chart-img" src="data:image/png;base64,${data.chart}" alt="评测对比图">`;
+    }
+    res.innerHTML = html;
+
+  } catch (e) {
+    prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">请求失败: ${e.message}</p>`;
+  }
+  btn.disabled = false;
+}
+
+// ================================================================
+// 实时匹配
+// ================================================================
+let selectedFile = null;
+let recordedBlob = null;
+
+// ---- 录音功能 (单按钮切换) ----
+let mediaRecorder = null;
+let mediaStream = null;
+let recordChunks = [];
+let recordStartTime = null;
+let recordTimerInterval = null;
+
+function cleanupRecording() {
+  // 彻底清理上一次录音的所有资源
+  if (recordTimerInterval) {
+    clearInterval(recordTimerInterval);
+    recordTimerInterval = null;
+  }
+  if (mediaRecorder) {
+    // 移除 onstop 避免旧回调在新录音期间触发
+    mediaRecorder.ondataavailable = null;
+    mediaRecorder.onstop = null;
+    mediaRecorder = null;
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  recordChunks = [];
+}
+
+function toggleRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    // 当前正在录音 → 停止
+    stopRecording();
+  } else {
+    // 当前空闲 → 开始录音
+    startRecording();
+  }
+}
+
+async function startRecording() {
+  const btnRecord = document.getElementById('btn-record');
+  const btnText = document.getElementById('record-btn-text');
+  const icon = document.getElementById('record-icon');
+  const timer = document.getElementById('record-timer');
+  const status = document.getElementById('record-status');
+  const ready = document.getElementById('record-ready');
+
+  // 先清理上次录音残留
+  cleanupRecording();
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
+
+    mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
+    recordChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) recordChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      // 保存录音结果
+      recordedBlob = new Blob(recordChunks, { type: mimeType });
+      const duration = Math.round((Date.now() - recordStartTime) / 1000);
+
+      // 更新 UI（可能已被 cleanupRecording 重置，需再次获取引用）
+      const elDuration = document.getElementById('record-duration');
+      const elReady = document.getElementById('record-ready');
+      const elStatus = document.getElementById('record-status');
+      const elTimer = document.getElementById('record-timer');
+      const elIcon = document.getElementById('record-icon');
+      const elBtnText = document.getElementById('record-btn-text');
+      const elBtnRecord = document.getElementById('btn-record');
+      const elBtnMatch = document.getElementById('btn-match-run');
+      const elFileName = document.getElementById('file-name');
+      const elAudioFile = document.getElementById('audio-file');
+
+      if (elDuration) elDuration.textContent = duration;
+      if (elReady) elReady.style.display = 'block';
+      if (elStatus) elStatus.style.display = 'none';
+      if (elTimer) elTimer.style.display = 'none';
+      if (elIcon) elIcon.textContent = '🎤';
+      if (elBtnText) elBtnText.textContent = '重新录音';
+      if (elBtnRecord) elBtnRecord.disabled = false;
+      if (elBtnMatch) elBtnMatch.disabled = false;
+
+      // 清除上传文件
+      selectedFile = null;
+      if (elFileName) elFileName.textContent = '';
+      if (elAudioFile) elAudioFile.value = '';
+
+      // 释放流
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      clearInterval(recordTimerInterval);
+      recordTimerInterval = null;
+    };
+
+    mediaRecorder.start();
+    recordStartTime = Date.now();
+
+    // 更新 UI 为录音中状态
+    icon.textContent = '⏺️';
+    btnText.textContent = '停止录音';
+    btnRecord.disabled = false;
+    timer.style.display = 'inline';
+    timer.textContent = '00:00';
+    status.style.display = 'inline';
+    status.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);animation:spin 1s linear infinite;margin-right:6px;"></span>录音中';
+    ready.style.display = 'none';
+    document.getElementById('btn-match-run').disabled = true;
+
+    recordTimerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+      const min = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const sec = String(elapsed % 60).padStart(2, '0');
+      const elTimer = document.getElementById('record-timer');
+      if (elTimer) elTimer.textContent = `${min}:${sec}`;
+    }, 200);
+
+  } catch (e) {
+    alert('无法访问麦克风: ' + e.message);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    clearInterval(recordTimerInterval);
+    recordTimerInterval = null;
+    const status = document.getElementById('record-status');
+    if (status) status.textContent = '处理中…';
+  }
+}
+
+// ---- 上传文件 ----
+function onFileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  selectedFile = file;
+  recordedBlob = null;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('btn-match-run').disabled = false;
+  // 清除录音状态
+  cleanupRecording();
+  document.getElementById('record-ready').style.display = 'none';
+  document.getElementById('record-icon').textContent = '🎤';
+  document.getElementById('record-btn-text').textContent = '开始录音';
+  document.getElementById('btn-record').disabled = false;
+  document.getElementById('record-timer').style.display = 'none';
+  document.getElementById('record-status').style.display = 'none';
+}
+
+// ---- 执行匹配 ----
+async function runMatch() {
+  if (!selectedFile && !recordedBlob) return;
+
+  const btn = document.getElementById('btn-match-run');
+  const prog = document.getElementById('match-progress');
+  const res = document.getElementById('match-results');
+
+  btn.disabled = true;
+  prog.innerHTML = '<div class="progress-msg"><span class="spinner"></span> 正在上传、分离人声并匹配…（可能需要 1–3 分钟）</div>';
+  res.innerHTML = '';
+
+  try {
+    const formData = new FormData();
+    if (recordedBlob) {
+      formData.append('audio', recordedBlob, 'recording.webm');
+    } else {
+      formData.append('audio', selectedFile);
+    }
+
+    const resp = await fetch('/api/match', { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (data.error) { prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">${data.error}</p>`; btn.disabled = false; return; }
+
+    prog.innerHTML = '';
+
+    let html = '';
+    if (data.separation_used) {
+      html += '<p style="color:var(--green);font-size:0.83rem;margin-bottom:10px;">已启用 AI 人声分离</p>';
+    }
+
+    html += `<div class="summary-grid">
+      <div class="summary-card"><div class="label">最佳匹配</div><div class="value" style="font-size:1.1rem;">${data.top_match}</div></div>
+      <div class="summary-card"><div class="label">DTW 距离</div><div class="value">${data.results[0].dist}</div></div>
+    </div>`;
+
+    html += '<h3 style="font-size:0.85rem;margin-bottom:8px;color:var(--text-secondary);">Top-10 候选歌曲</h3>';
+    html += '<ul class="result-list">';
+    data.results.forEach((r, i) => {
+      html += `<li class="result-item">
+        <span class="result-rank">${i + 1}</span>
+        <span class="result-song">${r.song}</span>
+        <span class="result-dist">${r.dist}</span>
+      </li>`;
+    });
+    html += '</ul>';
+
+    if (data.chart) {
+      html += `<img class="chart-img" src="data:image/png;base64,${data.chart}" alt="匹配可视化">`;
+    }
+
+    res.innerHTML = html;
+
+  } catch (e) {
+    prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">请求失败: ${e.message}</p>`;
+  }
+  btn.disabled = false;
+}
+
+// ---- 拖拽上传 ----
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    selectedFile = file;
+    recordedBlob = null;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('btn-match-run').disabled = false;
+    cleanupRecording();
+    document.getElementById('record-ready').style.display = 'none';
+    document.getElementById('record-icon').textContent = '🎤';
+    document.getElementById('record-btn-text').textContent = '开始录音';
+    document.getElementById('btn-record').disabled = false;
+    document.getElementById('record-timer').style.display = 'none';
+    document.getElementById('record-status').style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>
