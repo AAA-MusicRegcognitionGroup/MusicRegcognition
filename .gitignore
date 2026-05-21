@@ -35,9 +35,9 @@ env/
 Thumbs.db
 
 # 模型文件/缓存结果
-*.npy
-*.npz
-*.pkl
-*.h5
-*.pt
-*.pth
+# *.npy
+# *.npz
+# *.pkl
+# *.h5
+# *.pt
+# *.pth
