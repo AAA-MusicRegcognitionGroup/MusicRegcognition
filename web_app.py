@@ -73,12 +73,19 @@ def evaluate_one(num_str, task_dir="demo_samples/task2"):
     diff_abs = np.abs(ext - pv_ref)
     strict_correct = int(np.sum((diff_abs <= 1.0) & valid))
     mod_diff = np.abs((ext - pv_ref) % 12)
-    octave_correct = int(np.sum(((mod_diff <= 1.0) | (mod_diff >= 11.0)) & (ext > 0) & valid))
+
+    # DTW distance between extracted pitch and MIDI reference
+    midi_path = f"midi_cache/{num_str}.npy"
+    if os.path.exists(midi_path):
+        midi_seq = np.load(midi_path)
+        dtw_dist = float(calculate_similarity(ext, midi_seq))
+    else:
+        dtw_dist = None
 
     return {
         "id": num_str,
         "strict_acc": round((strict_correct / total_valid) * 100, 2),
-        "octave_acc": round((octave_correct / total_valid) * 100, 2),
+        "dtw_dist": round(dtw_dist, 4) if dtw_dist is not None else None,
         "mean_error": round(float(np.mean(mod_diff[valid])), 3),
         "total_frames": total_valid,
     }
@@ -174,20 +181,20 @@ def batch_evaluate():
             results.append(r)
 
     strict_vals = [r['strict_acc'] for r in results]
-    octave_vals = [r['octave_acc'] for r in results]
+    dtw_vals = [r['dtw_dist'] for r in results if r['dtw_dist'] is not None]
     error_vals = [r['mean_error'] for r in results]
 
     summary = {}
     if results:
         summary = {
             "avg_strict": round(np.mean(strict_vals), 2),
-            "avg_octave": round(np.mean(octave_vals), 2),
+            "avg_dtw": round(np.mean(dtw_vals), 4) if dtw_vals else None,
             "avg_error": round(np.mean(error_vals), 3),
             "max_strict": round(np.max(strict_vals), 2),
-            "max_octave": round(np.max(octave_vals), 2),
+            "min_dtw": round(np.min(dtw_vals), 4) if dtw_vals else None,
+            "max_dtw": round(np.max(dtw_vals), 4) if dtw_vals else None,
             "best_error": round(np.min(error_vals), 3),
             "min_strict": round(np.min(strict_vals), 2),
-            "min_octave": round(np.min(octave_vals), 2),
             "worst_error": round(np.max(error_vals), 3),
             "total_evaluated": len(results),
         }
@@ -207,6 +214,22 @@ def evaluate_single(song_id):
         return jsonify({"error": f"歌曲 {num_str} 不存在或无效"}), 404
     chart_b64 = build_eval_chart(num_str)
     r["chart"] = chart_b64
+
+    # DTW ranking: compare extracted pitch against ALL MIDI files
+    wav_path = f"demo_samples/task2/{num_str}.wav"
+    extracted = get_pitch_contour(wav_path, sr=8000, frame_samples=256, hop_samples=256)
+    cache_dir = "midi_cache/"
+    npy_files = sorted(glob.glob(os.path.join(cache_dir, "*.npy")))
+    ranking = []
+    for n_file in npy_files:
+        mid = os.path.basename(n_file).replace(".npy", "")
+        midi_seq = np.load(n_file)
+        score = calculate_similarity(extracted, midi_seq)
+        ranking.append({"song": mid, "dist": round(float(score), 4)})
+    ranking.sort(key=lambda x: x["dist"])
+    r["ranking"] = ranking
+    r["dtw_rank"] = next((i + 1 for i, item in enumerate(ranking) if item["song"] == num_str), None)
+
     return jsonify(r)
 
 
@@ -233,21 +256,23 @@ def match_live():
     save_path = os.path.join(upload_dir, f"upload_{uid}.wav")
     wavfile.write(save_path, 8000, (y * 32767).astype(np.int16))
 
-    # Try voice separation (best-effort)
+    # Voice separation (optional, controlled by frontend)
+    separate = request.form.get('separate', 'true').lower() == 'true'
     vocal_path = save_path
     separation_used = False
-    try:
-        from split_demo import run_audio_separation
-        output_files = run_audio_separation(save_path, output_dir=upload_dir)
-        for f in output_files:
-            basename = os.path.basename(f)
-            if "(Vocals)" in basename or "vocals" in basename.lower():
-                if os.path.exists(f):
-                    vocal_path = f
-                    separation_used = True
-                    break
-    except Exception:
-        pass
+    if separate:
+        try:
+            from split_demo import run_audio_separation
+            output_files = run_audio_separation(save_path, output_dir=upload_dir)
+            for f in output_files:
+                basename = os.path.basename(f)
+                if "(Vocals)" in basename or "vocals" in basename.lower():
+                    if os.path.exists(f):
+                        vocal_path = f
+                        separation_used = True
+                        break
+        except Exception:
+            pass
 
     # Extract pitch contour
     live_seq = get_pitch_contour(vocal_path, sr=8000, frame_samples=256, hop_samples=256)

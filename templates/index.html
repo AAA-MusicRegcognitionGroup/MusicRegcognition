@@ -307,7 +307,7 @@
     <div class="card">
       <h2>实时哼唱识别</h2>
       <p style="color:var(--text-secondary);font-size:0.83rem;margin-bottom:16px;">
-        现场录音或上传哼唱音频。系统将提取基频，尝试 AI 人声分离（如有），并通过子序列 DTW 算法在 14 首曲库中检索最匹配的歌曲。
+        现场录音或上传哼唱音频。系统将提取基频，并通过子序列 DTW 算法在 14 首曲库中检索最匹配的歌曲。可选择是否先进行 AI 人声分离。
       </p>
 
       <!-- 录音区域 -->
@@ -343,9 +343,14 @@
       </div>
       <input type="file" id="audio-file" accept="audio/*,.wav,.mp3,.webm,.ogg,.flac,.m4a" onchange="onFileSelected(event)">
 
-      <button class="btn btn-primary" id="btn-match-run" style="margin-top:14px;" onclick="runMatch()" disabled>
-        开始匹配
-      </button>
+      <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="btn-match-nosep" onclick="runMatch(false)" disabled>
+          不分离伴奏
+        </button>
+        <button class="btn btn-primary" id="btn-match-sep" onclick="runMatch(true)" disabled>
+          分离伴奏
+        </button>
+      </div>
 
       <div id="match-progress"></div>
       <div id="match-results"></div>
@@ -410,20 +415,20 @@ async function runBatch() {
       const s = data.summary;
       html += `<div class="summary-grid">
         <div class="summary-card"><div class="label">平均严格准确率</div><div class="value ${metricClass(s.avg_strict, 80, 50)}">${s.avg_strict}%</div></div>
-        <div class="summary-card"><div class="label">平均八度容错率</div><div class="value ${metricClass(s.avg_octave, 85, 55)}">${s.avg_octave}%</div></div>
+        <div class="summary-card"><div class="label">平均DTW距离</div><div class="value">${s.avg_dtw ?? '-'}</div></div>
         <div class="summary-card"><div class="label">平均半音误差</div><div class="value">${s.avg_error}</div></div>
         <div class="summary-card"><div class="label">最高严格准确率</div><div class="value metric-good">${s.max_strict}%</div></div>
         <div class="summary-card"><div class="label">评测样本数</div><div class="value">${s.total_evaluated}</div></div>
       </div>`;
     }
 
-    html += '<div class="table-wrap"><table><thead><tr><th>编号</th><th>有效帧数</th><th>严格准确率</th><th>八度容错</th><th>平均半音误差</th></tr></thead><tbody>';
+    html += '<div class="table-wrap"><table><thead><tr><th>编号</th><th>有效帧数</th><th>严格准确率</th><th>DTW距离</th><th>平均半音误差</th></tr></thead><tbody>';
     data.results.forEach(r => {
       html += `<tr>
         <td class="num"><strong>${r.id}</strong></td>
         <td class="num">${r.total_frames}</td>
         <td><span class="num ${metricClass(r.strict_acc, 80, 50)}">${r.strict_acc}%</span></td>
-        <td><span class="num ${metricClass(r.octave_acc, 85, 55)}">${r.octave_acc}%</span></td>
+        <td class="num">${r.dtw_dist ?? '-'}</td>
         <td class="num">${r.mean_error}</td>
       </tr>`;
     });
@@ -466,11 +471,24 @@ async function runSingle() {
     let html = `<div class="summary-grid">
       <div class="summary-card"><div class="label">有效帧数</div><div class="value">${data.total_frames}</div></div>
       <div class="summary-card"><div class="label">严格准确率</div><div class="value ${metricClass(data.strict_acc, 80, 50)}">${data.strict_acc}%</div></div>
-      <div class="summary-card"><div class="label">八度容错率</div><div class="value ${metricClass(data.octave_acc, 85, 55)}">${data.octave_acc}%</div></div>
+      <div class="summary-card"><div class="label">与原曲DTW距离</div><div class="value">${data.dtw_dist ?? '-'}</div></div>
       <div class="summary-card"><div class="label">平均半音误差</div><div class="value">${data.mean_error} 半音</div></div>
     </div>`;
     if (data.chart) {
       html += `<img class="chart-img" src="data:image/png;base64,${data.chart}" alt="评测对比图">`;
+    }
+    if (data.ranking && data.ranking.length > 0) {
+      html += '<h4 style="margin-top:20px;">DTW 排名（该哼唱 vs 全部曲库）</h4>';
+      html += '<div class="table-wrap"><table><thead><tr><th>排名</th><th>歌曲编号</th><th>DTW距离</th></tr></thead><tbody>';
+      data.ranking.forEach((item, idx) => {
+        const match = item.song === data.id;
+        html += `<tr${match ? ' style="background:var(--accent-light);font-weight:bold;"' : ''}>
+          <td class="num">${idx + 1}</td>
+          <td class="num">${item.song}${match ? ' ◀ 原曲' : ''}</td>
+          <td class="num">${item.dist}</td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
     }
     res.innerHTML = html;
 
@@ -492,6 +510,13 @@ let mediaStream = null;
 let recordChunks = [];
 let recordStartTime = null;
 let recordTimerInterval = null;
+
+function setMatchButtons(enabled) {
+  const nosep = document.getElementById('btn-match-nosep');
+  const sep = document.getElementById('btn-match-sep');
+  if (nosep) nosep.disabled = !enabled;
+  if (sep) sep.disabled = !enabled;
+}
 
 function cleanupRecording() {
   // 彻底清理上一次录音的所有资源
@@ -562,7 +587,8 @@ async function startRecording() {
       const elIcon = document.getElementById('record-icon');
       const elBtnText = document.getElementById('record-btn-text');
       const elBtnRecord = document.getElementById('btn-record');
-      const elBtnMatch = document.getElementById('btn-match-run');
+      const elBtnMatchNoSep = document.getElementById('btn-match-nosep');
+      const elBtnMatchSep = document.getElementById('btn-match-sep');
       const elFileName = document.getElementById('file-name');
       const elAudioFile = document.getElementById('audio-file');
 
@@ -573,7 +599,8 @@ async function startRecording() {
       if (elIcon) elIcon.textContent = '🎤';
       if (elBtnText) elBtnText.textContent = '重新录音';
       if (elBtnRecord) elBtnRecord.disabled = false;
-      if (elBtnMatch) elBtnMatch.disabled = false;
+      if (elBtnMatchNoSep) elBtnMatchNoSep.disabled = false;
+      if (elBtnMatchSep) elBtnMatchSep.disabled = false;
 
       // 清除上传文件
       selectedFile = null;
@@ -601,7 +628,7 @@ async function startRecording() {
     status.style.display = 'inline';
     status.innerHTML = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);animation:spin 1s linear infinite;margin-right:6px;"></span>录音中';
     ready.style.display = 'none';
-    document.getElementById('btn-match-run').disabled = true;
+    setMatchButtons(false);
 
     recordTimerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
@@ -633,7 +660,7 @@ function onFileSelected(e) {
   selectedFile = file;
   recordedBlob = null;
   document.getElementById('file-name').textContent = file.name;
-  document.getElementById('btn-match-run').disabled = false;
+  setMatchButtons(true);
   // 清除录音状态
   cleanupRecording();
   document.getElementById('record-ready').style.display = 'none';
@@ -645,15 +672,15 @@ function onFileSelected(e) {
 }
 
 // ---- 执行匹配 ----
-async function runMatch() {
+async function runMatch(separate) {
   if (!selectedFile && !recordedBlob) return;
 
-  const btn = document.getElementById('btn-match-run');
   const prog = document.getElementById('match-progress');
   const res = document.getElementById('match-results');
 
-  btn.disabled = true;
-  prog.innerHTML = '<div class="progress-msg"><span class="spinner"></span> 正在上传、分离人声并匹配…（可能需要 1–3 分钟）</div>';
+  setMatchButtons(false);
+  const msg = separate ? '正在上传、AI 分离人声并匹配…（可能需要 1–3 分钟）' : '正在上传并匹配…';
+  prog.innerHTML = `<div class="progress-msg"><span class="spinner"></span> ${msg}</div>`;
   res.innerHTML = '';
 
   try {
@@ -663,11 +690,12 @@ async function runMatch() {
     } else {
       formData.append('audio', selectedFile);
     }
+    formData.append('separate', separate);
 
     const resp = await fetch('/api/match', { method: 'POST', body: formData });
     const data = await resp.json();
 
-    if (data.error) { prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">${data.error}</p>`; btn.disabled = false; return; }
+    if (data.error) { prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">${data.error}</p>`; setMatchButtons(true); return; }
 
     prog.innerHTML = '';
 
@@ -701,7 +729,7 @@ async function runMatch() {
   } catch (e) {
     prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">请求失败: ${e.message}</p>`;
   }
-  btn.disabled = false;
+  setMatchButtons(true);
 }
 
 // ---- 拖拽上传 ----
@@ -716,7 +744,7 @@ zone.addEventListener('drop', e => {
     selectedFile = file;
     recordedBlob = null;
     document.getElementById('file-name').textContent = file.name;
-    document.getElementById('btn-match-run').disabled = false;
+    setMatchButtons(true);
     cleanupRecording();
     document.getElementById('record-ready').style.display = 'none';
     document.getElementById('record-icon').textContent = '🎤';

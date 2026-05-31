@@ -3,6 +3,7 @@
 *.mp3
 *.mid
 *.midi
+/.claude/
 /data/
 /dataset/
 /MIR-QBSH/
