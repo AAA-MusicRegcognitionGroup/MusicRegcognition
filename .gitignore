@@ -3,19 +3,23 @@
 *.mp3
 *.mid
 *.midi
+*.webm
 /.claude/
 /data/
 /dataset/
 /MIR-QBSH/
 /separator_models/
 
-# 允许上传用于演示的小样本音频 (放到 demo_samples 文件夹下)
+# 允许上传 demo_samples 和 midi_cache 中的内容
 !demo_samples/**/*.wav
 !demo_samples/**/*.mp3
 !demo_samples/**/*.mid
+!midi_cache/**/*.npy
 
+# demo_samples 中的临时录音/分离产物
+demo_samples/进阶1/
 
-# Python 缓存与运行生成文件
+# Python 缓存
 __pycache__/
 *.py[cod]
 *$py.class
@@ -34,15 +38,3 @@ env/
 .vscode/
 .DS_Store
 Thumbs.db
-
-# 模型文件/缓存结果
-# *.npy
-# *.npz
-# *.pkl
-# *.h5
-# *.pt
-# *.pth
-
-# AI agent files
-.claude
-.claude/
