@@ -24,7 +24,7 @@ from extract_pitch import extract_pitch
     print(f"提取了 {len(pitch_contour)} 帧基频: {pitch_contour[:10]}...")
 """
 
-def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold='auto'):
+def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, window='hamming', energy_threshold='auto', apply_median=True):
     """
     读取整个音频文件，提取基频轨迹（序列）
 
@@ -33,6 +33,7 @@ def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, w
     :param frame_samples: 帧长 (采样点数)，默认 256
     :param hop_samples: 帧移 (采样点数)，默认 256
     :param window: 传给单帧提取算法的窗函数类型
+    :param apply_median: 是否应用中值滤波去噪，默认 True。
     :param energy_threshold: 能量阈值。'auto' 时自适应计算 (median*0.4, 最低 0.015)；
                              传入数值则使用固定阈值。低于阈值的帧视为静音，基频置 0。
     :return: 包含所有帧基频的一维 numpy 数组序列 (Pitch Contour)
@@ -80,8 +81,9 @@ def get_pitch_contour(audio_path, sr=8000, frame_samples=256, hop_samples=256, w
     # 6. 利用中值滤波进行平滑去噪（去除离群的误判突刺）
     # 只有非0(有效发声)部分才应该被滤波，否则休止符会被抹平
     pitch_array = np.array(pitch_contour)
-    valid_idx = pitch_array > 0
-    if np.any(valid_idx):
-        pitch_array[valid_idx] = medfilt(pitch_array[valid_idx], kernel_size=11)
+    if apply_median:
+        valid_idx = pitch_array > 0
+        if np.any(valid_idx):
+            pitch_array[valid_idx] = medfilt(pitch_array[valid_idx], kernel_size=11)
         
     return pitch_array

@@ -3,7 +3,11 @@ scipy
 librosa
 matplotlib
 pretty_midi
-audio-separator[cpu]
+
 Flask
+
 pyaudio
+
 pygame
+
+"audio-separator[cpu]"

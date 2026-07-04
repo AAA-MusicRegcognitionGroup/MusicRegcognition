@@ -8,8 +8,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import librosa
+import pretty_midi
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from scipy.io import wavfile
 
 from process_audio import get_pitch_contour
@@ -314,6 +315,43 @@ def list_songs():
             if f.endswith('.mid'):
                 songs.append(os.path.splitext(f)[0])
     return jsonify(songs)
+
+
+def synthesize_midi_to_wav(song_id):
+    """Synthesize MIDI to WAV bytes in memory, with on-disk caching."""
+    cache_dir = "midi_audio_cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_path = os.path.join(cache_dir, f"{song_id}.wav")
+
+    if os.path.exists(cache_path):
+        with open(cache_path, 'rb') as f:
+            return f.read()
+
+    midi_path = f"demo_samples/midiFile/{song_id}.mid"
+    if not os.path.exists(midi_path):
+        return None
+
+    midi = pretty_midi.PrettyMIDI(midi_path)
+    # Use built-in sine-wave synthesis — no SoundFont needed
+    audio = midi.synthesize(fs=22050)
+    audio_int16 = (audio * 32767 * 0.8).astype(np.int16)
+
+    buf = io.BytesIO()
+    wavfile.write(buf, 22050, audio_int16)
+    wav_bytes = buf.getvalue()
+
+    with open(cache_path, 'wb') as f:
+        f.write(wav_bytes)
+
+    return wav_bytes
+
+
+@app.route('/api/midi_audio/<song_id>', methods=['GET'])
+def midi_audio(song_id):
+    wav_bytes = synthesize_midi_to_wav(song_id)
+    if wav_bytes is None:
+        return jsonify({"error": f"MIDI {song_id} 不存在"}), 404
+    return Response(wav_bytes, mimetype='audio/wav')
 
 
 if __name__ == '__main__':

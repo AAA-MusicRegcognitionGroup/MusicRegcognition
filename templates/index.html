@@ -707,7 +707,10 @@ async function runMatch(separate) {
     html += `<div class="summary-grid">
       <div class="summary-card"><div class="label">最佳匹配</div><div class="value" style="font-size:1.1rem;">${data.top_match}</div></div>
       <div class="summary-card"><div class="label">DTW 距离</div><div class="value">${data.results[0].dist}</div></div>
-    </div>`;
+    </div>
+    <button class="btn btn-primary" style="margin-bottom:16px;" onclick="playMidiAudio('${data.top_match}', this)">
+      ▶ 播放识别结果
+    </button>`;
 
     html += '<h3 style="font-size:0.85rem;margin-bottom:8px;color:var(--text-secondary);">Top-10 候选歌曲</h3>';
     html += '<ul class="result-list">';
@@ -730,6 +733,59 @@ async function runMatch(separate) {
     prog.innerHTML = `<p style="color:var(--red);margin-top:12px;">请求失败: ${e.message}</p>`;
   }
   setMatchButtons(true);
+}
+
+let currentAudio = null;
+let currentBtn = null;
+
+function playMidiAudio(songId, btn) {
+  // 正在播放中，点击暂停
+  if (currentAudio && !currentAudio.paused) {
+    currentAudio.pause();
+    btn.textContent = '▶ 播放识别结果';
+    btn.classList.remove('btn-playing');
+    return;
+  }
+
+  // 暂停后恢复播放
+  if (currentAudio && currentAudio.paused && currentBtn === btn) {
+    currentAudio.play();
+    btn.textContent = '⏸ 暂停';
+    btn.classList.add('btn-playing');
+    return;
+  }
+
+  // 停止其他正在播放的音频
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+    if (currentBtn) {
+      currentBtn.textContent = '▶ 播放识别结果';
+      currentBtn.classList.remove('btn-playing');
+    }
+  }
+
+  // 开始新的播放
+  btn.textContent = '⏸ 暂停';
+  btn.classList.add('btn-playing');
+
+  const audio = new Audio('/api/midi_audio/' + songId);
+  currentAudio = audio;
+  currentBtn = btn;
+
+  audio.play();
+  audio.onended = () => {
+    btn.textContent = '▶ 播放识别结果';
+    btn.classList.remove('btn-playing');
+    currentAudio = null;
+    currentBtn = null;
+  };
+  audio.onerror = () => {
+    btn.textContent = '▶ 播放识别结果';
+    btn.classList.remove('btn-playing');
+    currentAudio = null;
+    currentBtn = null;
+  };
 }
 
 // ---- 拖拽上传 ----
